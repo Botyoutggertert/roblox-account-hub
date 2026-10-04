@@ -28,6 +28,7 @@ export default function handler(req: IncomingMessage, res: ServerResponse): void
     state,
     nonce,
     verifier,
+    redirectUri,
     createdAt: Date.now(),
   };
 

@@ -17,6 +17,7 @@ export const App: React.FC = () => {
     status: 'NOT CONNECTED',
     lastChecked: new Date().toISOString(),
   });
+  const [oauthError, setOauthError] = useState('');
 
   // TOTP data is local, but authorization is always reconciled with its runtime owner.
   useEffect(() => {
@@ -28,7 +29,7 @@ export const App: React.FC = () => {
         const callbackStatus = await RobloxAuthorizationService.handleWebCallback();
         const status = callbackStatus || await RobloxAuthorizationService.checkStatus();
         if (active) setAuthStatus(status);
-      } catch {
+      } catch (error) {
         // A cached Connected status is never trusted when runtime verification fails.
         const failed: RobloxAuthStatus = {
           status: 'CONNECTION ERROR',
@@ -37,7 +38,11 @@ export const App: React.FC = () => {
           tokenStatus: 'FAIL',
         };
         RobloxAuthorizationService.saveAuthStatus(failed);
-        if (active) setAuthStatus(failed);
+        if (active) {
+          setAuthStatus(failed);
+          setOauthError(error instanceof Error ? error.message : 'The Roblox connection could not be completed.');
+          setCurrentTab('roblox-connection');
+        }
       }
     };
 
@@ -91,7 +96,9 @@ export const App: React.FC = () => {
         {currentTab === 'roblox-connection' && (
           <RobloxConnectionPage
             authStatus={authStatus}
+            oauthError={oauthError}
             onStatusChange={handleAuthStatusChange}
+            onOAuthErrorClear={() => setOauthError('')}
           />
         )}
       </main>

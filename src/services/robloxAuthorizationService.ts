@@ -133,6 +133,19 @@ const cleanOAuthCallbackQuery = (url: URL): void => {
   }
 };
 
+const OAUTH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  access_denied: 'Roblox authorization was cancelled or denied.',
+  session_missing: 'The Roblox authorization session was not found. Please try connecting again.',
+  session_invalid: 'The Roblox authorization session could not be verified. Please try connecting again.',
+  session_expired: 'The Roblox authorization session expired. Please try connecting again.',
+  state_mismatch: 'The Roblox authorization response could not be verified. Please try connecting again.',
+  missing_code: 'Roblox did not return an authorization code. Please try connecting again.',
+  token_exchange_failed: 'Roblox could not complete the secure token exchange. Please try again.',
+  id_token_invalid: 'Roblox returned an identity token that could not be verified. Please try again.',
+  userinfo_failed: 'Roblox could not verify the account profile. Please try again.',
+  connection_failed: 'The Roblox connection could not be completed. Please try again.',
+};
+
 const getCallbackResult = (url: URL): { present: boolean; error?: string } => {
   const statusValue = url.searchParams.get('roblox_oauth')
     || url.searchParams.get('roblox_oauth_status')
@@ -141,14 +154,12 @@ const getCallbackResult = (url: URL): { present: boolean; error?: string } => {
   const explicitError = url.searchParams.get('roblox_oauth_error')
     || url.searchParams.get('oauth_error');
   const hasOAuthMarkers = statusValue !== null || explicitError !== null;
-  const providerError = hasOAuthMarkers
-    ? url.searchParams.get('error_description') || url.searchParams.get('error')
-    : null;
   const failedStatus = statusValue && ['error', 'failed', 'failure', 'denied'].includes(statusValue.toLowerCase());
+  const errorCode = explicitError || (failedStatus ? 'connection_failed' : undefined);
 
   return {
     present: hasOAuthMarkers,
-    error: explicitError || providerError || (failedStatus ? 'Roblox authorization was not completed.' : undefined),
+    error: errorCode ? OAUTH_ERROR_MESSAGES[errorCode] || OAUTH_ERROR_MESSAGES.connection_failed : undefined,
   };
 };
 
@@ -204,9 +215,8 @@ export class RobloxAuthorizationService {
     if (!result.present) return null;
     cleanOAuthCallbackQuery(callback);
 
-    const status = await this.checkStatus();
     if (result.error) throw new Error(result.error);
-    return status;
+    return this.checkStatus();
   }
 
   static async checkStatus(): Promise<RobloxAuthStatus> {

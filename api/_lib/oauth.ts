@@ -5,6 +5,8 @@ export const AUTHORIZE_ENDPOINT = 'https://apis.roblox.com/oauth/v1/authorize';
 export const TOKEN_ENDPOINT = 'https://apis.roblox.com/oauth/v1/token';
 export const USERINFO_ENDPOINT = 'https://apis.roblox.com/oauth/v1/userinfo';
 export const REVOKE_ENDPOINT = 'https://apis.roblox.com/oauth/v1/token/revoke';
+export const ROBLOX_ISSUER = 'https://apis.roblox.com/oauth/';
+export const ROBLOX_JWKS_ENDPOINT = 'https://apis.roblox.com/oauth/v1/certs';
 
 export const SESSION_COOKIE_NAME = 'rah_oauth_session';
 export const AUTH_COOKIE_NAME = 'rah_oauth_auth';

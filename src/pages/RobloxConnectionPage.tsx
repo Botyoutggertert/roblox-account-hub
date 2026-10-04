@@ -6,7 +6,9 @@ import { formatDate } from '../utils/date';
 
 interface RobloxConnectionPageProps {
   authStatus: RobloxAuthStatus;
+  oauthError?: string;
   onStatusChange: (status: RobloxAuthStatus) => void;
+  onOAuthErrorClear?: () => void;
 }
 
 const emptyDiagnostics: OAuthDiagnostics = {
@@ -15,7 +17,12 @@ const emptyDiagnostics: OAuthDiagnostics = {
   tokenValidation: 'NOT CONFIGURED', maskedClientId: 'Not configured', redirectUriValue: 'Not configured',
 };
 
-export const RobloxConnectionPage: React.FC<RobloxConnectionPageProps> = ({ authStatus, onStatusChange }) => {
+export const RobloxConnectionPage: React.FC<RobloxConnectionPageProps> = ({
+  authStatus,
+  oauthError = '',
+  onStatusChange,
+  onOAuthErrorClear,
+}) => {
   const [isChecking, setIsChecking] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [error, setError] = useState('');
@@ -35,6 +42,7 @@ export const RobloxConnectionPage: React.FC<RobloxConnectionPageProps> = ({ auth
 
   const handleConnectWithRoblox = async () => {
     setError('');
+    onOAuthErrorClear?.();
     setIsAuthorizing(true);
     try {
       await RobloxAuthorizationService.initiateOAuthFlow();
@@ -98,13 +106,13 @@ export const RobloxConnectionPage: React.FC<RobloxConnectionPageProps> = ({ auth
           <p className="text-slate-400 mt-1">Official OAuth 2.0 connection with PKCE and verified Roblox identity.</p>
         </div>
 
-        {error && <div className="p-4 rounded-lg border border-danger/30 bg-danger/10 text-danger flex gap-3"><AlertTriangle className="w-5 h-5 shrink-0" /><span>{error}</span></div>}
+        {(oauthError || error) && <div className="p-4 rounded-lg border border-danger/30 bg-danger/10 text-danger flex gap-3"><AlertTriangle className="w-5 h-5 shrink-0" /><span>{oauthError || error}</span></div>}
 
         <div className={`rounded-xl border p-6 ${statusConfig.bg}`}>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${authStatus.status === 'CONNECTED' ? 'bg-success/20' : 'bg-slate-800'}`}><StatusIcon className={`w-7 h-7 ${statusConfig.color}`} /></div>
-              <div><p className="text-sm text-slate-400">OAuth Status</p><h2 className={`text-xl font-bold ${statusConfig.color}`}>{statusConfig.label}</h2></div>
+              <div><p className="text-sm text-slate-400">OAuth Status</p><h2 className={`text-xl font-bold ${statusConfig.color}`}>{statusConfig.label}</h2>{authStatus.status === 'CONNECTION ERROR' && oauthError && <p className="text-sm text-danger mt-1 max-w-xl">{oauthError}</p>}</div>
             </div>
             <div className="flex gap-2">
               {authStatus.status === 'CONNECTED' && <button onClick={handleCheckStatus} disabled={isChecking} className="btn-secondary"><RefreshCw className={`w-4 h-4 ${isChecking ? 'animate-spin' : ''}`} />Verify</button>}

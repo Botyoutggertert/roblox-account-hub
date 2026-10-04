@@ -9,6 +9,7 @@ import {
 } from '../api/_lib/oauth';
 import diagnosticsHandler from '../api/oauth/roblox/diagnostics';
 import startHandler from '../api/oauth/roblox/start';
+import callbackHandler from '../api/oauth/roblox/callback';
 import statusHandler from '../api/oauth/roblox/status';
 import disconnectHandler from '../api/oauth/roblox/disconnect';
 
@@ -61,6 +62,7 @@ describe('Vercel OAuth Handlers Suite', () => {
       const cookieVal = headers['Set-Cookie'];
 
       expect(cookieVal).toContain(`${SESSION_COOKIE_NAME}=sample-token`);
+      expect(cookieVal).toContain('Path=/');
       expect(cookieVal).toContain('HttpOnly');
       expect(cookieVal).toContain('SameSite=Lax');
       expect(cookieVal).toContain('Secure');
@@ -146,6 +148,114 @@ describe('Vercel OAuth Handlers Suite', () => {
       expect(headers['Location']).toContain('code_challenge_method=S256');
       expect(headers['Location']).toContain('nonce=');
       expect(headers['Set-Cookie']).toContain(SESSION_COOKIE_NAME);
+    });
+  });
+
+  describe('Callback Handler', () => {
+    const createResponse = () => {
+      const headers: Record<string, any> = {};
+      return {
+        headers,
+        response: {
+          statusCode: 0,
+          getHeader: (key: string) => headers[key],
+          setHeader: (key: string, value: any) => { headers[key] = value; },
+          end: vi.fn(),
+        } as any,
+      };
+    };
+
+    it('reports a missing session cookie without logging callback secrets', async () => {
+      process.env.ROBLOX_OAUTH_CLIENT_ID = '123456789012';
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { headers, response } = createResponse();
+      const req: any = {
+        url: '/api/oauth/roblox/callback?code=authorization-secret&state=state-secret',
+        headers: { host: 'myapp.vercel.app', 'x-forwarded-proto': 'https' },
+      };
+
+      await callbackHandler(req, response);
+
+      expect(headers.Location).toContain('oauth_error=session_missing');
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).toContain('session_cookie');
+      expect(logged).not.toContain('authorization-secret');
+      expect(logged).not.toContain('state-secret');
+    });
+
+    it('reuses the exact redirect URI from start for the token exchange', async () => {
+      process.env.ROBLOX_OAUTH_CLIENT_ID = '123456789012';
+      process.env.ROBLOX_OAUTH_REDIRECT_URI = 'https://myapp.vercel.app/api/oauth/roblox/callback';
+      const start = createResponse();
+      startHandler({ headers: { host: 'myapp.vercel.app' } } as any, start.response);
+      const setCookieHeader = String(start.headers['Set-Cookie']);
+      const sessionCookie = setCookieHeader.split(';')[0];
+      const authorizeUrl = new URL(start.headers.Location);
+      const state = authorizeUrl.searchParams.get('state');
+
+      process.env.ROBLOX_OAUTH_REDIRECT_URI = 'https://changed.example/api/oauth/roblox/callback';
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: vi.fn().mockResolvedValue({ error: 'invalid_grant', error_description: 'Rejected' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const callback = createResponse();
+      const req: any = {
+        url: `/api/oauth/roblox/callback?code=authorization-code&state=${encodeURIComponent(state || '')}`,
+        headers: {
+          host: 'myapp.vercel.app',
+          'x-forwarded-proto': 'https',
+          cookie: sessionCookie,
+        },
+      };
+
+      await callbackHandler(req, callback.response);
+
+      expect(callback.headers.Location).toContain('oauth_error=token_exchange_failed');
+      const tokenRequest = fetchMock.mock.calls[0][1];
+      const body = tokenRequest.body as URLSearchParams;
+      expect(tokenRequest.headers['Content-Type']).toBe('application/x-www-form-urlencoded');
+      expect(body.get('redirect_uri')).toBe('https://myapp.vercel.app/api/oauth/roblox/callback');
+      expect(body.get('code_verifier')).toBeTruthy();
+      expect(body.get('client_id')).toBe('123456789012');
+    });
+
+    it('uses stable token exchange errors and logs only safe provider details', async () => {
+      process.env.ROBLOX_OAUTH_CLIENT_ID = '123456789012';
+      const session = encryptPayload({
+        state: 'expected-state',
+        nonce: 'nonce',
+        verifier: 'verifier-secret',
+        redirectUri: 'https://myapp.vercel.app/api/oauth/roblox/callback',
+        createdAt: Date.now(),
+      });
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: vi.fn().mockResolvedValue({ error: 'invalid_client', error_description: 'Client rejected' }),
+      }));
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      const { headers, response } = createResponse();
+      const req: any = {
+        url: '/api/oauth/roblox/callback?code=authorization-secret&state=expected-state',
+        headers: {
+          host: 'myapp.vercel.app',
+          'x-forwarded-proto': 'https',
+          cookie: `${SESSION_COOKIE_NAME}=${session}`,
+        },
+      };
+
+      await callbackHandler(req, response);
+
+      expect(headers.Location).toContain('oauth_error=token_exchange_failed');
+      expect(headers.Location).not.toContain('invalid_client');
+      const logged = JSON.stringify(errorSpy.mock.calls);
+      expect(logged).toContain('401');
+      expect(logged).toContain('invalid_client');
+      expect(logged).not.toContain('authorization-secret');
+      expect(logged).not.toContain('verifier-secret');
     });
   });
 

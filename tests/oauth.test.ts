@@ -159,14 +159,24 @@ describe('OAuth callback and status handling', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('surfaces callback errors and strips OAuth query data', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, { status: 'NOT CONNECTED' })));
+  it('maps callback error codes, strips OAuth query data, and skips status requests', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
 
     await expect(RobloxAuthorizationService.handleWebCallback(
-      'http://localhost/callback?roblox_oauth=failed&oauth_error=User%20cancelled&keep=this',
-    )).rejects.toThrow('User cancelled');
+      'http://localhost/callback?roblox_oauth=failed&oauth_error=token_exchange_failed&keep=this',
+    )).rejects.toThrow('Roblox could not complete the secure token exchange');
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(RobloxAuthorizationService.getAuthStatus().status).toBe('NOT CONNECTED');
     expect(history.replaceState).toHaveBeenCalledWith({}, 'Account Hub', '/callback?keep=this');
+  });
+
+  it('does not display unknown callback error values', async () => {
+    vi.stubGlobal('fetch', vi.fn());
+
+    await expect(RobloxAuthorizationService.handleWebCallback(
+      'http://localhost/callback?roblox_oauth=failed&oauth_error=provider%20internal%20details',
+    )).rejects.toThrow('The Roblox connection could not be completed');
   });
 
   it('refuses a server CONNECTED response without verified identity fields', async () => {
