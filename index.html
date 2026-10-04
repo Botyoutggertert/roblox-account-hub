@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Roblox Account Hub</title>
+    <!-- Prevent standard Electron drag bugs on buttons/inputs -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https://* data: blob:; img-src 'self' data: https://* blob:; media-src 'self' data: https://* blob:;" />
+  </head>
+  <body class="bg-background text-slate-100 antialiased selection:bg-primary selection:text-white overflow-hidden select-none">
+    <div id="root" class="h-screen w-screen flex flex-col"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
