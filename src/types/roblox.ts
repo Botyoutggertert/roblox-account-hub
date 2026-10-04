@@ -147,6 +147,8 @@ export type DiagnosticStatus = 'PASS' | 'FAIL' | 'NOT CONFIGURED' | 'CHECKING';
 
 export interface OAuthDiagnostics {
   clientId: DiagnosticStatus;
+  clientSecret?: DiagnosticStatus;
+  clientSecretConfigured?: boolean;
   authorization: DiagnosticStatus;
   redirectUri: DiagnosticStatus;
   callback: DiagnosticStatus;

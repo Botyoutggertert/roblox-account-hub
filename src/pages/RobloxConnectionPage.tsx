@@ -140,12 +140,16 @@ export const RobloxConnectionPage: React.FC<RobloxConnectionPageProps> = ({
         <div className="panel p-6">
           <h3 className="font-semibold text-white flex items-center gap-2"><Key className="w-5 h-5 text-primary" />Check User Diagnostics</h3>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-            {(['clientId', 'authorization', 'redirectUri', 'callback', 'tokenExchange', 'userInfo', 'tokenValidation'] as const).map(key => (
-              <div key={key} className="bg-slate-900/50 rounded-lg p-3 border border-slate-800">
-                <p className="text-xs uppercase tracking-wide text-slate-500">{key.replace(/([A-Z])/g, ' $1')}</p>
-                <p className={`mt-1 font-semibold ${diagnostics[key] === 'PASS' ? 'text-success' : diagnostics[key] === 'FAIL' ? 'text-danger' : 'text-slate-400'}`}>{diagnostics[key]}</p>
-              </div>
-            ))}
+            {(['clientId', 'clientSecret', 'authorization', 'redirectUri', 'callback', 'tokenExchange', 'userInfo', 'tokenValidation'] as const).map(key => {
+              const val = diagnostics[key];
+              if (!val) return null;
+              return (
+                <div key={key} className="bg-slate-900/50 rounded-lg p-3 border border-slate-800">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">{key.replace(/([A-Z])/g, ' $1')}</p>
+                  <p className={`mt-1 font-semibold ${val === 'PASS' ? 'text-success' : val === 'FAIL' ? 'text-danger' : 'text-slate-400'}`}>{val}</p>
+                </div>
+              );
+            })}
           </div>
           <div className="mt-4 text-sm space-y-2 border-t border-slate-800 pt-4">
             <p className="flex justify-between gap-4"><span className="text-slate-500">Masked Client ID</span><span className="font-mono text-slate-300">{diagnostics.maskedClientId}</span></p>

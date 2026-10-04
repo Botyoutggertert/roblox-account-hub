@@ -1,33 +1,41 @@
+import crypto from 'crypto';
 import type { IncomingMessage, ServerResponse } from 'http';
 import {
   AUTHORIZE_ENDPOINT,
   SESSION_COOKIE_NAME,
+  base64Url,
   encryptPayload,
-  generatePkce,
   getWebOAuthConfig,
   setCookie,
 } from '../../_lib/oauth';
 
 export default function handler(req: IncomingMessage, res: ServerResponse): void {
-  const { clientId, redirectUri } = getWebOAuthConfig(req);
+  const { clientId, clientSecret, redirectUri } = getWebOAuthConfig(req);
 
-  if (!clientId || clientId === 'ROBLOX_OAUTH_CLIENT_ID') {
+  if (
+    !clientId ||
+    clientId === 'ROBLOX_OAUTH_CLIENT_ID' ||
+    !clientSecret ||
+    clientSecret === 'ROBLOX_OAUTH_CLIENT_SECRET'
+  ) {
     res.statusCode = 400;
     res.setHeader('Content-Type', 'application/json');
     res.end(
       JSON.stringify({
-        error: 'Roblox OAuth is not configured. Set ROBLOX_OAUTH_CLIENT_ID in Vercel environment variables.',
+        error:
+          'Roblox OAuth is not configured. Set ROBLOX_OAUTH_CLIENT_ID and ROBLOX_OAUTH_CLIENT_SECRET in Vercel environment variables.',
       })
     );
     return;
   }
 
-  const { state, nonce, verifier, challenge } = generatePkce();
+  // Generate random state for CSRF mitigation and nonce for OIDC token binding
+  const state = base64Url(crypto.randomBytes(32));
+  const nonce = base64Url(crypto.randomBytes(32));
 
   const sessionData = {
     state,
     nonce,
-    verifier,
     redirectUri,
     createdAt: Date.now(),
   };
@@ -36,6 +44,9 @@ export default function handler(req: IncomingMessage, res: ServerResponse): void
   const encryptedSession = encryptPayload(sessionData);
   setCookie(res, SESSION_COOKIE_NAME, encryptedSession, { maxAgeSeconds: 600 });
 
+  // Confidential client authorization code flow:
+  // PKCE parameters (code_challenge, code_challenge_method) are omitted as specified by Roblox docs.
+  // The client_secret is server-side only and never sent in the browser authorization URL.
   const url = new URL(AUTHORIZE_ENDPOINT);
   url.search = new URLSearchParams({
     client_id: clientId,
@@ -44,8 +55,6 @@ export default function handler(req: IncomingMessage, res: ServerResponse): void
     scope: 'openid profile',
     state,
     nonce,
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
   }).toString();
 
   res.statusCode = 302;

@@ -3,7 +3,11 @@
 
 ## Roblox OAuth configuration
 
-Create an OAuth 2.0 application in the Roblox Creator Dashboard and register the redirect URI exactly. The application uses Authorization Code with PKCE and OpenID Connect (`openid profile`). It never sends OAuth credentials to the renderer or displays tokens.
+Create an OAuth 2.0 application in the Roblox Creator Dashboard and register the redirect URI exactly. The application supports two flows:
+- **Website (Vercel)**: Roblox confidential-client Authorization Code flow using a server-only `client_secret` during token exchange.
+- **Desktop (Electron)**: Public client Authorization Code flow with PKCE (`code_challenge` and `code_verifier`). No client secret is ever stored or used in the desktop app.
+
+It never sends OAuth credentials to the renderer or displays tokens.
 
 ### Website on Vercel
 
@@ -12,15 +16,16 @@ Create an OAuth 2.0 application in the Roblox Creator Dashboard and register the
    `https://YOUR_DOMAIN/api/oauth/roblox/callback`
 3. Configure these server-side Vercel environment variables for Production (and Development when using `vercel dev`):
    - `ROBLOX_OAUTH_CLIENT_ID`: the real Roblox OAuth client ID.
+   - `ROBLOX_OAUTH_CLIENT_SECRET`: the server-only confidential client secret from Roblox Creator Dashboard.
    - `ROBLOX_OAUTH_REDIRECT_URI`: the exact HTTPS callback above.
    - `ROBLOX_OAUTH_SESSION_SECRET`: at least 32 random bytes used to protect short-lived HttpOnly cookies.
 4. Build with `npm run build`; Vercel serves `dist` and runs the handlers under `api/`.
 
-Do not configure OAuth with `VITE_ROBLOX_OAUTH_*`. Vite variables are embedded in browser JavaScript. The website's OAuth configuration, PKCE verifier, state, nonce, and tokens remain server-side or in encrypted Secure HttpOnly cookies.
+Do not configure OAuth with `VITE_ROBLOX_OAUTH_*`. Vite variables are embedded in browser JavaScript. The website's OAuth configuration, client secret, state, nonce, and tokens remain server-side or in encrypted Secure HttpOnly cookies. The website uses Roblox's confidential-client flow to exchange authorization codes securely from the Vercel backend without device binding errors.
 
 ### Electron
 
-Set `ROBLOX_OAUTH_CLIENT_ID` and `ROBLOX_OAUTH_REDIRECT_URI` in the Electron process environment, or copy `.env.example` to the ignored local `.env` for development. The desktop redirect must be an HTTP loopback URI with a fixed port, such as `http://127.0.0.1:53682/oauth/callback`, and that complete URI must be registered in Roblox Creator Dashboard.
+Set `ROBLOX_OAUTH_CLIENT_ID` and `ROBLOX_OAUTH_REDIRECT_URI` in the Electron process environment, or copy `.env.example` to the ignored local `.env` for development. The desktop redirect must be an HTTP loopback URI with a fixed port, such as `http://127.0.0.1:53682/oauth/callback`, and that complete URI must be registered in Roblox Creator Dashboard. The Electron app uses the public client Authorization Code flow with PKCE (no client secret is ever used in the desktop application).
 
 The web HTTPS callback and Electron loopback callback normally require separate environment configurations (and, if Roblox does not permit both redirects on one OAuth application, separate OAuth applications). Never commit a real client ID with secrets or any access/refresh token. The repository's existing `.env` is not overwritten automatically.
 

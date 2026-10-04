@@ -16,15 +16,22 @@ interface AuthCookieData {
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const cookie = getCookie(req, AUTH_COOKIE_NAME);
   const data = decryptPayload<AuthCookieData>(cookie);
-  const { clientId } = getWebOAuthConfig(req);
+  const { clientId, clientSecret } = getWebOAuthConfig(req);
 
   // Revoke token if present
   if (data?.refreshToken && clientId) {
     try {
+      const revokeBody = new URLSearchParams({
+        token: data.refreshToken,
+        client_id: clientId,
+      });
+      if (clientSecret && clientSecret !== 'ROBLOX_OAUTH_CLIENT_SECRET') {
+        revokeBody.set('client_secret', clientSecret);
+      }
       await fetch(REVOKE_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ token: data.refreshToken, client_id: clientId }),
+        body: revokeBody,
       });
     } catch {}
   }

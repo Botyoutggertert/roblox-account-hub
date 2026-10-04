@@ -103,8 +103,9 @@ export function maskClientId(clientId?: string): string {
   return `${clientId.slice(0, 4)}••••${clientId.slice(-4)}`;
 }
 
-export function getWebOAuthConfig(req?: IncomingMessage): { clientId: string; redirectUri: string } {
+export function getWebOAuthConfig(req?: IncomingMessage): { clientId: string; clientSecret: string; redirectUri: string } {
   const clientId = String(process.env.ROBLOX_OAUTH_CLIENT_ID || '').trim();
+  const clientSecret = String(process.env.ROBLOX_OAUTH_CLIENT_SECRET || '').trim();
   let redirectUri = String(process.env.ROBLOX_OAUTH_REDIRECT_URI || '').trim();
 
   if (!redirectUri && req) {
@@ -113,7 +114,7 @@ export function getWebOAuthConfig(req?: IncomingMessage): { clientId: string; re
     redirectUri = `${proto}://${host}/api/oauth/roblox/callback`;
   }
 
-  return { clientId, redirectUri };
+  return { clientId, clientSecret, redirectUri };
 }
 
 export function generatePkce(): { verifier: string; challenge: string; state: string; nonce: string } {

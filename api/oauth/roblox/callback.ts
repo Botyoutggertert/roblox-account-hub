@@ -17,7 +17,7 @@ import {
 interface SessionData {
   state: string;
   nonce: string;
-  verifier: string;
+  verifier?: string;
   redirectUri: string;
   createdAt: number;
 }
@@ -95,7 +95,7 @@ const isSessionData = (value: unknown): value is SessionData => {
     session
     && typeof session.state === 'string' && session.state
     && typeof session.nonce === 'string' && session.nonce
-    && typeof session.verifier === 'string' && session.verifier
+    && (session.verifier === undefined || typeof session.verifier === 'string')
     && typeof session.redirectUri === 'string' && session.redirectUri
     && typeof session.createdAt === 'number' && Number.isFinite(session.createdAt)
   );
@@ -172,7 +172,7 @@ async function validateIdToken(
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse): Promise<void> {
-  const { clientId } = getWebOAuthConfig(req);
+  const { clientId, clientSecret } = getWebOAuthConfig(req);
   const host = req.headers.host || 'localhost';
   const protoHeader = req.headers['x-forwarded-proto'];
   const proto = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader || 'https';
@@ -229,14 +229,20 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   let step: 'token_exchange' | 'id_token_validation' | 'userinfo' = 'token_exchange';
   try {
+    if (!clientSecret || clientSecret === 'ROBLOX_OAUTH_CLIENT_SECRET') {
+      logOAuthError('configuration', { reason: 'missing_client_secret' });
+      redirectWithError(res, 'connection_failed');
+      return;
+    }
+
     const tokenResponse = await fetch(TOKEN_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
         code,
-        code_verifier: sessionData.verifier,
         client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: sessionData.redirectUri,
       }),
     });
